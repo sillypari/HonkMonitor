@@ -31,14 +31,41 @@ class HornDetector(
     private var audioRecord: AudioRecord? = null
     private var lastHonkAt = 0L
     
-    // Target frequencies for horn detection (300Hz - 2000Hz range)
-    private val targetFreqs = listOf(300.0, 500.0, 800.0, 1200.0, 1500.0, 2000.0)
+    // Target frequencies for Indian vehicle horns (more specific ranges)
+    private val hornFreqRanges = listOf(
+        // Primary horn frequencies (most Indian vehicles)
+        FreqRange(400.0, 450.0, 1.0),   // Low car horns
+        FreqRange(480.0, 520.0, 1.2),   // Standard car horns  
+        FreqRange(600.0, 650.0, 1.1),   // Compact car horns
+        FreqRange(800.0, 900.0, 1.3),   // Motorcycle/scooter horns
+        FreqRange(1000.0, 1200.0, 1.1), // Higher pitch cars
+        FreqRange(1400.0, 1600.0, 0.8), // Trucks/buses (lower priority)
+        // Avoid music frequencies
+        FreqRange(250.0, 350.0, 0.3),   // Too low (music bass)
+        FreqRange(2000.0, 4000.0, 0.2)  // Too high (music treble)
+    )
     
     private val goertzelFilters by lazy {
-        targetFreqs.map { freq ->
-            Goertzel(sampleRate, bufferSize, freq)
+        hornFreqRanges.map { range ->
+            HornFreqFilter(
+                Goertzel(sampleRate, bufferSize, range.centerFreq),
+                range.weight,
+                range.minFreq,
+                range.maxFreq
+            )
         }
     }
+    
+    data class FreqRange(val minFreq: Double, val maxFreq: Double, val weight: Double) {
+        val centerFreq = (minFreq + maxFreq) / 2.0
+    }
+    
+    data class HornFreqFilter(
+        val goertzel: Goertzel,
+        val weight: Double,
+        val minFreq: Double,
+        val maxFreq: Double
+    )
     
     fun start(onHonkDetected: (HonkEvent) -> Unit) {
         if (running.getAndSet(true)) {
@@ -62,6 +89,7 @@ class HornDetector(
         running.set(false)
     }
     
+    @Suppress("MissingPermission")
     private fun initializeAudioRecord() {
         val minBufferSize = AudioRecord.getMinBufferSize(
             sampleRate,
@@ -113,21 +141,33 @@ class HornDetector(
             // Adaptive noise floor with slow adaptation
             noiseBaseline = (noiseBaseline * 0.98) + (rms * 0.02)
             
-            // Calculate band energy using Goertzel filters
-            var totalBandEnergy = 0.0
+            // Calculate weighted band energy using Indian horn frequency analysis
+            var totalHornScore = 0.0
+            var totalMusicScore = 0.0
+            
             for (filter in goertzelFilters) {
-                totalBandEnergy += filter.process(buffer, samplesRead)
+                val energy = filter.goertzel.process(buffer, samplesRead)
+                val normalizedEnergy = energy / samplesRead
+                
+                if (filter.weight > 0.5) {
+                    // Horn frequency ranges (weighted positive)
+                    totalHornScore += normalizedEnergy * filter.weight
+                } else {
+                    // Music frequency ranges (weighted negative)
+                    totalMusicScore += normalizedEnergy * filter.weight
+                }
             }
             
-            val normalizedBandEnergy = totalBandEnergy / samplesRead
+            // Advanced horn detection logic
+            val hornToMusicRatio = if (totalMusicScore > 0) totalHornScore / totalMusicScore else totalHornScore
+            val adaptiveThreshold = calculateAdaptiveThreshold(noiseBaseline, rms)
             
-            // Horn detection logic
-            if (isHornDetected(normalizedBandEnergy, noiseBaseline)) {
+            if (isIndianHornPattern(totalHornScore, hornToMusicRatio, adaptiveThreshold, rms)) {
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastHonkAt > DEBOUNCE_MS) {
                     lastHonkAt = currentTime
                     
-                    val confidence = calculateConfidence(normalizedBandEnergy, noiseBaseline)
+                    val confidence = calculateConfidence(totalHornScore, totalMusicScore, noiseBaseline)
                     val honkEvent = HonkEvent(
                         timestamp = currentTime,
                         latitude = 0.0, // Will be filled by the service
@@ -152,9 +192,44 @@ class HornDetector(
         return bandEnergy > threshold
     }
     
-    private fun calculateConfidence(bandEnergy: Double, noiseBaseline: Double): Double {
-        val ratio = if (noiseBaseline > 0) bandEnergy / noiseBaseline else 0.0
-        return (ratio / 10.0).coerceIn(0.0, 1.0) // Normalize to 0-1 range
+    private fun calculateAdaptiveThreshold(noiseBaseline: Double, rms: Double): Double {
+        // Dynamic threshold based on current noise levels and signal strength
+        val baseThreshold = 6.0 * noiseBaseline
+        val signalAdjustment = rms * 0.1 // Adjust based on current signal level
+        return maxOf(baseThreshold, signalAdjustment)
+    }
+    
+    private fun isIndianHornPattern(hornScore: Double, hornToMusicRatio: Double, threshold: Double, rms: Double): Boolean {
+        // Check if signal strength exceeds adaptive threshold
+        if (hornScore < threshold) return false
+        
+        // Indian horns typically have strong presence in 400-1600Hz range
+        // and show dominance over music frequencies
+        val hasStrongHornSignal = hornScore > (rms * 0.3) // Horn signal is significant portion of total
+        val dominatesMusic = hornToMusicRatio > 2.0 // Horn frequencies dominate music frequencies
+        val adequateSignalStrength = rms > 0.02 // Minimum signal strength to avoid noise
+        
+        return hasStrongHornSignal && dominatesMusic && adequateSignalStrength
+    }
+    
+    private fun calculateConfidence(hornScore: Double, musicScore: Double, noiseBaseline: Double): Double {
+        // Calculate horn-to-music ratio
+        val hornToMusicRatio = if (musicScore > 0.001) hornScore / musicScore else hornScore / 0.001
+        
+        // Calculate signal-to-noise ratio for overall energy
+        val totalEnergy = hornScore + musicScore
+        val snr = totalEnergy / maxOf(noiseBaseline, 0.001)
+        
+        // Confidence based on horn dominance and signal strength
+        val hornDominance = hornScore / maxOf(totalEnergy, 0.001)
+        val baseConfidence = minOf(1.0, snr / 10.0)
+        
+        // Boost confidence if horn frequencies dominate over music frequencies
+        return if (hornToMusicRatio > 1.5 && hornDominance > 0.6) {
+            minOf(1.0, baseConfidence * 1.5)
+        } else {
+            baseConfidence * hornDominance
+        }
     }
     
     private fun cleanup() {

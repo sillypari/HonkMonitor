@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -27,12 +28,12 @@
         android:gravity="center" />
 
     <!-- Statistics Card -->
-    <androidx.cardview.widget.CardView
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="24dp"
-        android:cardCornerRadius="8dp"
-        android:cardElevation="4dp">
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -66,7 +67,7 @@
 
         </LinearLayout>
 
-    </androidx.cardview.widget.CardView>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Control Buttons -->
     <Button
@@ -75,8 +76,7 @@
         android:layout_height="60dp"
         android:text="Start Monitoring"
         android:textSize="16sp"
-        android:layout_marginBottom="16dp"
-        style="@style/Widget.Material3.Button.Icon" />
+        android:layout_marginBottom="16dp" />
 
     <!-- Action Buttons Row -->
     <LinearLayout
@@ -92,8 +92,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="Export CSV"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
+            android:text="Export CSV" />
 
         <Button
             android:id="@+id/btn_clear"
@@ -101,19 +100,18 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:text="Clear Data"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
+            android:text="Clear Data" />
 
     </LinearLayout>
 
     <!-- Info Card -->
-    <androidx.cardview.widget.CardView
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:cardCornerRadius="8dp"
-        android:cardElevation="2dp"
-        android:cardBackgroundColor="#F5F5F5">
+        app:cardCornerRadius="8dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#F5F5F5">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -138,6 +136,6 @@
 
         </LinearLayout>
 
-    </androidx.cardview.widget.CardView>
+    </com.google.android.material.card.MaterialCardView>
 
 </LinearLayout>

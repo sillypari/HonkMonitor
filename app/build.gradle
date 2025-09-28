@@ -1,6 +1,6 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
-apply plugin: 'kotlin-kapt'
+apply plugin: 'com.google.devtools.ksp'
 
 android {
     namespace 'com.honkmonitor'
@@ -23,11 +23,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '1.8'
     }
     buildFeatures {
         viewBinding true
@@ -40,13 +40,16 @@ dependencies {
     implementation 'com.google.android.material:material:1.10.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
+    // CardView for material cards
+    implementation 'androidx.cardview:cardview:1.0.0'
+    
     // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     
     // Room database
     implementation 'androidx.room:room-runtime:2.5.0'
     implementation 'androidx.room:room-ktx:2.5.0'
-    kapt 'androidx.room:room-compiler:2.5.0'
+    ksp 'androidx.room:room-compiler:2.5.0'
     
     // Location services
     implementation 'com.google.android.gms:play-services-location:21.0.1'
